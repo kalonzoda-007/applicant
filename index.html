@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#F8F6EE">
+<title>FATIR · Заявщик</title><script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+:root{font-family:Manrope,system-ui,sans-serif;color:#2E3A2F;background:#F8F6EE}*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 80% 0,#e5eddf,#F8F6EE 55%);min-height:100vh}
+header{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #dfe7d9;background:#ffffffab;backdrop-filter:blur(24px);position:sticky;top:0;z-index:5}
+.logo{background:#2E3A2F;color:white;border-radius:13px;width:43px;height:43px;display:grid;place-items:center;font-size:24px;font-weight:800}
+header b{font-size:15px}header small{display:block;color:#7d8d78;font-size:10px}main{max-width:760px;margin:0 auto;padding:20px 13px 70px}
+h1{font-size:28px;letter-spacing:-1px;margin:5px 0 2px}h2{margin:0;font-size:17px}p.hint{color:#82907c;font-size:12px}
+.panel{background:#ffffffb5;backdrop-filter:blur(22px);border:1px solid #fff;border-radius:21px;padding:18px;margin:15px 0;box-shadow:0 16px 35px #2e3a2f0d}
+.kicker{font-size:11px;font-weight:800;color:#6B7F5B;letter-spacing:1.3px}.section{display:flex;gap:10px;align-items:center;margin-bottom:13px}.num{width:32px;height:32px;border-radius:11px;background:#2E3A2F;color:white;display:grid;place-items:center;font-size:12px}
+label{display:block;font-size:11px;font-weight:800;margin:11px 0 6px;color:#6B7F5B}
+input,select,textarea{font-family:inherit;font-size:13px;color:#2E3A2F;background:white;border:1px solid #dce6d8;outline:0;border-radius:12px;min-height:44px;width:100%;padding:10px}
+input:focus,select:focus,textarea:focus{border-color:#6B7F5B;box-shadow:0 0 0 3px #6b7f5b21}
+.twocol{display:grid;grid-template-columns:1fr 1fr;gap:12px}button{font:700 13px Manrope,sans-serif;cursor:pointer}
+button:disabled{opacity:.55;cursor:not-allowed}.primary{width:100%;height:52px;border:0;border-radius:14px;background:#2E3A2F;color:white;display:flex;align-items:center;justify-content:center;gap:9px}
+.smallbtn{background:#eaf0e5;border:1px solid #c7d7c1;color:#2E3A2F;border-radius:12px;min-height:42px;padding:0 12px}
+.line{background:#f4f6f1;border:1px solid #e3e9df;padding:13px;border-radius:16px;margin:12px 0}
+.linehead{display:flex;justify-content:space-between;align-items:center;font-weight:800;font-size:12px}
+.linehead button{background:none;border:0;color:#985e57;padding:5px;font-size:18px}
+.segment{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.segment button{border:1px solid #dbe4d6;background:white;color:#6B7F5B;min-height:43px;border-radius:12px}
+.segment button.on{background:#2E3A2F;color:white;border-color:#2E3A2F}
+.total{display:flex;justify-content:space-between;border-top:1px solid #dfe6db;padding-top:14px;margin-top:16px;font-weight:800}
+.note{color:#8e8b79;font-size:11px;line-height:1.6}.error{padding:12px;background:#fff0ef;border:1px solid #edd1cd;border-radius:12px;color:#a04439;margin:12px 0;font-size:12px}
+.success{background:#ebf3e8;padding:20px;text-align:center;border-radius:22px}.hidden{display:none!important}
+#gate{max-width:380px;min-height:77vh;margin:auto;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:25px}
+.lock{font-size:35px;background:white;border-radius:20px;padding:23px}.badge{margin-left:auto;color:#6B7F5B;font-size:10px;font-weight:800}
+@media(max-width:480px){main{padding:17px 12px 70px}.panel{padding:15px}.twocol{grid-template-columns:1fr;gap:0}h1{font-size:25px}}
+</style></head>
+<body><header><div class="logo">F</div><div><b>FATIR · Заявщик</b><small>Telegram Mini App · Logistic System</small></div><span class="badge">ПРИВАТНЫЙ ДОСТУП</span></header>
+<div id="gate"><div class="lock">🔒</div><h2 id="gateTitle" style="margin-top:20px">Проверка доступа</h2><p id="gateDesc" class="hint">Проверяем Telegram ID по таблице USERS…</p></div>
+<main id="main" class="hidden"><span class="kicker">FATIR · СОЗДАНИЕ ЗАЯВКИ</span><h1>Новая заявка</h1><p class="hint" id="who">Один заказ · несколько заводов · общий номер ORD</p>
+<div class="panel"><div class="section"><span class="num">01</span><h2>Заказчик</h2></div>
+<label>Клиент из базы</label><select id="clientId"><option value="">+ Новый клиент</option></select>
+<div id="newClient"><label>Название магазина / ФИО</label><input id="clientName" placeholder="Введите нового клиента"></div>
+<div class="twocol"><div><label>Регион</label><select id="region"><option>Согдийская область</option><option>Душанбе</option><option>Хатлонская область</option><option>ГБАО</option></select></div><div><label>Город / район</label><input id="city" placeholder="Истаравшан"></div></div></div>
+<div class="panel"><div class="section"><span class="num">02</span><h2>Товары и заводы</h2></div><div id="lines"></div><button class="smallbtn" id="add">+ Добавить товар</button><div class="total"><span id="bags">0 мешков</span><span id="weight">0 кг</span></div><p class="note">Выбор завода не резервирует товар. Остатки подтверждает склад.</p></div>
+<div class="panel"><div class="section"><span class="num">03</span><h2>Условия отгрузки</h2></div>
+<label>Способ получения</label><div class="segment"><button id="pickup" class="on">📦 Самовывоз</button><button id="delivery">🚚 Доставка</button></div>
+<div class="twocol"><div><label>Дата</label><input id="date" type="date"></div><div><label>Адрес / ориентир</label><input id="address" placeholder="Необязательно для самовывоза"></div></div>
+<label>Примечание</label><textarea id="notes" rows="3" placeholder="Например: машина клиента, особые условия…"></textarea></div>
+<div id="error" class="error hidden"></div><button id="submit" class="primary">Зарегистрировать заявку →</button><p class="note" style="text-align:center">Доступ проверяется сервером. Google Sheets · FATIR</p>
+</main>
+<main id="result" class="hidden"><div class="success"><h2>✅ Заявка зарегистрирована</h2><h1 id="orderCode"></h1><p id="orderInfo"></p><p id="notification"></p><button class="primary" id="again">Создать ещё заявку</button></div></main>
+<script>
+'use strict';
+const API='https://api-v2.appdeploy.ai/app/fatir-mini-app-j17de2';
+const tg=window.Telegram?.WebApp;
+const $=id=>document.getElementById(id);
+let products=[],clients=[],lines=[],deliveryType='Самовывоз',requestId=makeId(),loading=false;
+const plantNames=[['PL-AGR','Агро'],['PL-ALN','Альянс'],['PL-GLS','Гулистан']];
+function makeId(){return crypto.randomUUID().replaceAll('-','')}
+function textError(err){return typeof err==='string'?err:(err?.message||'Ошибка подключения')}
+function escapeText(text){return String(text??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+async function request(endpoint,body){
+  let res;
+  try{res=await fetch(API+'/api/'+endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...body,initData:tg?.initData||''})})}
+  catch{throw new Error('Не удалось связаться с сервером FATIR. Проверьте подключение.')}
+  const content=await res.json().catch(()=>({error:'Ответ сервера повреждён'}));
+  if(!res.ok)throw new Error(content.error||'Сервер отклонил запрос');
+  return content;
+}
+function deny(message){$('gateTitle').textContent='Доступ ограничен';$('gateDesc').textContent=message;$('main').classList.add('hidden')}
+async function initialize(){
+ if(!tg?.initData){deny('Откройте страницу через кнопку Mini App вашего бота FATIR в Telegram. Обычный браузер не передаёт авторизацию.');return}
+ tg.ready();tg.expand();
+ try{
+  const data=await request('bootstrap',{});
+  products=data.products||[];clients=data.clients||[];
+  $('who').textContent='Сотрудник: '+(data.user?.name||'FATIR')+' · роль '+(data.user?.role||'');
+  $('clientId').innerHTML='<option value="">+ Новый клиент</option>'+clients.map(c=>'<option value="'+escapeText(c.code)+'">'+escapeText(c.name)+' · '+escapeText(c.code)+'</option>').join('');
+  $('date').value=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Dushanbe',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()).reduce((a,p)=>(a[p.type]=p.value,a),{}).year+'-'+new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Dushanbe',month:'2-digit'}).format(new Date())+'-'+new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Dushanbe',day:'2-digit'}).format(new Date());
+  $('gate').classList.add('hidden');$('main').classList.remove('hidden');addLine();
+ }catch(e){deny(textError(e))}
+}
+function addLine(){
+ const key=makeId();
+ lines.push({key,productCode:'',plant:'',quantity:1});renderLines();
+}
+function renderLines(){
+ $('lines').innerHTML=lines.map((line,index)=>'<div class="line"><div class="linehead"><span>Позиция '+(index+1)+'</span><button aria-label="Удалить" data-remove="'+line.key+'">×</button></div><label>Наименование товара</label><select data-field="productCode" data-key="'+line.key+'"><option value="">Выберите товар</option>'+products.map(p=>'<option value="'+escapeText(p.code)+'" '+(line.productCode===p.code?'selected':'')+'>'+escapeText(p.name)+' · '+escapeText(p.code)+'</option>').join('')+'</select><div class="twocol"><div><label>Завод</label><select data-field="plant" data-key="'+line.key+'"><option value="">Выберите завод</option>'+plantNames.map(([c,n])=>'<option value="'+c+'" '+(line.plant===c?'selected':'')+'>'+n+'</option>').join('')+'</select></div><div><label>Количество, мешков</label><input data-field="quantity" data-key="'+line.key+'" type="number" min="1" step="1" value="'+line.quantity+'"></div></div></div>').join('');
+ $('lines').querySelectorAll('[data-field]').forEach(el=>el.addEventListener('input',()=>{const line=lines.find(x=>x.key===el.dataset.key);if(line){line[el.dataset.field]=el.dataset.field==='quantity'?Number(el.value):el.value;total()}}));
+ $('lines').querySelectorAll('[data-remove]').forEach(el=>el.onclick=()=>{if(lines.length>1){lines=lines.filter(x=>x.key!==el.dataset.remove);renderLines()}});
+ total();
+}
+function total(){const count=lines.reduce((n,x)=>n+(Number(x.quantity)||0),0),kg=lines.reduce((n,x)=>n+(products.find(p=>p.code===x.productCode)?.weight||0)*(Number(x.quantity)||0),0);$('bags').textContent=count+' мешков';$('weight').textContent=kg.toLocaleString('ru-RU')+' кг'}
+$('clientId').addEventListener('change',()=>{const c=clients.find(x=>x.code===$('clientId').value);$('newClient').classList.toggle('hidden',!!c);if(c){$('region').value=c.region||'Согдийская область';$('city').value=c.city||''}});
+$('add').onclick=addLine;
+function mode(m){deliveryType=m;$('pickup').classList.toggle('on',m==='Самовывоз');$('delivery').classList.toggle('on',m==='Доставка')}
+$('pickup').onclick=()=>mode('Самовывоз');$('delivery').onclick=()=>mode('Доставка');
+$('submit').onclick=async()=>{
+ if(loading)return;
+ $('error').classList.add('hidden');
+ if(!($('clientId').value||$('clientName').value.trim())||!$('city').value.trim()||!$('date').value||lines.some(x=>!x.productCode||!x.plant||!Number.isSafeInteger(x.quantity)||x.quantity<1)){showError('Проверьте клиента, город, дату, завод и количество каждого товара');return}
+ loading=true;$('submit').disabled=true;$('submit').textContent='Сохраняем…';
+ try{
+  const data=await request('orders',{requestId,clientId:$('clientId').value,clientName:$('clientName').value,region:$('region').value,city:$('city').value,deliveryDate:$('date').value,address:$('address').value,deliveryType,notes:$('notes').value,items:lines.map(x=>({productCode:x.productCode,quantity:x.quantity,plant:x.plant}))});
+  $('main').classList.add('hidden');$('result').classList.remove('hidden');$('orderCode').textContent=data.orderId;$('orderInfo').textContent='Код клиента: '+data.clientId+' · '+(data.requiresReview?'Клиент требует проверки':'Ожидает логиста');$('notification').textContent=data.delivered?'Карточка отправлена логистам':'Заказ сохранён, уведомление не доставлено';
+ }catch(e){showError(textError(e))}
+ finally{loading=false;$('submit').disabled=false;$('submit').textContent='Зарегистрировать заявку →'}
+};
+function showError(s){$('error').textContent=s;$('error').classList.remove('hidden')}
+$('again').onclick=()=>{requestId=makeId();lines=[];$('result').classList.add('hidden');$('main').classList.remove('hidden');addLine()};
+initialize();
+</script></body></html>

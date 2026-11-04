@@ -49,7 +49,7 @@ button:disabled{opacity:.55;cursor:not-allowed}.primary{width:100%;height:52px;b
 const API='https://api-v2.appdeploy.ai/app/fatir-mini-app-j17de2';
 const tg=window.Telegram?.WebApp;
 const $=id=>document.getElementById(id);
-let products=[],clients=[],lines=[],deliveryType='Самовывоз',requestId=makeId(),loading=false;
+let products=[],clients=[],lines=[],deliveryType='Самовывоз',requestId=sessionStorage.getItem('fatir.pending')||makeId(),loading=false;
 const plantNames=[['PL-AGR','Агро'],['PL-ALN','Альянс'],['PL-GLS','Гулистан']];
 function makeId(){return crypto.randomUUID().replaceAll('-','')}
 function textError(err){return typeof err==='string'?err:(err?.message||'Ошибка подключения')}
@@ -72,7 +72,7 @@ async function initialize(){
   $('who').textContent='Сотрудник: '+(data.user?.name||'FATIR')+' · роль '+(data.user?.role||'');
   $('clientId').innerHTML='<option value="">+ Новый клиент</option>'+clients.map(c=>'<option value="'+escapeText(c.code)+'">'+escapeText(c.name)+' · '+escapeText(c.code)+'</option>').join('');
   $('date').value=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Dushanbe',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()).reduce((a,p)=>(a[p.type]=p.value,a),{}).year+'-'+new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Dushanbe',month:'2-digit'}).format(new Date())+'-'+new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Dushanbe',day:'2-digit'}).format(new Date());
-  $('gate').classList.add('hidden');$('main').classList.remove('hidden');addLine();
+  $('gate').classList.add('hidden');$('main').classList.remove('hidden');addLine();if(sessionStorage.getItem('fatir.pending'))showPending();
  }catch(e){deny(textError(e))}
 }
 function addLine(){
@@ -97,11 +97,34 @@ $('submit').onclick=async()=>{
  loading=true;$('submit').disabled=true;$('submit').textContent='Сохраняем…';
  try{
   const data=await request('orders',{requestId,clientId:$('clientId').value,clientName:$('clientName').value,region:$('region').value,city:$('city').value,deliveryDate:$('date').value,address:$('address').value,deliveryType,notes:$('notes').value,items:lines.map(x=>({productCode:x.productCode,quantity:x.quantity,plant:x.plant}))});
-  $('main').classList.add('hidden');$('result').classList.remove('hidden');$('orderCode').textContent=data.orderId;$('orderInfo').textContent='Код клиента: '+data.clientId+' · '+(data.requiresReview?'Клиент требует проверки':'Ожидает логиста');$('notification').textContent=data.delivered?'Карточка отправлена логистам':'Заказ сохранён, уведомление не доставлено';
+  if(!data.accepted)throw Error('Сервер не подтвердил приём заявки');sessionStorage.setItem('fatir.pending',requestId);showPending();
  }catch(e){showError(textError(e))}
  finally{loading=false;$('submit').disabled=false;$('submit').textContent='Зарегистрировать заявку →'}
 };
+function showPending(){
+ $('main').classList.add('hidden');$('result').classList.remove('hidden');$('again').classList.add('hidden');
+ $('orderCode').textContent='Обрабатывается…';$('orderInfo').textContent='Проверяем товары и сохраняем заявку в Google Sheets';$('notification').textContent='Ожидание номера ORD · не отправляйте заявку ещё раз';
+ pollStatus();
+}
+async function pollStatus(){
+ for(let attempt=0;attempt<45;attempt++){
+  if(!sessionStorage.getItem('fatir.pending'))return;
+  try{
+   const data=await request('order-status',{requestId});
+   if(!data.pending&&data.orderId){
+    sessionStorage.removeItem('fatir.pending');
+    $('orderCode').textContent=data.orderId;
+    $('orderInfo').textContent='Код клиента: '+data.clientId+' · '+(data.requiresReview?'Новый клиент требует проверки':'Ожидает логиста');
+    $('notification').textContent='Заказ сохранён в Google Sheets и поступил логистам';
+    $('again').classList.remove('hidden');
+    return;
+   }
+  }catch(e){$('notification').textContent='Повторная проверка связи… '+textError(e)}
+  await new Promise(resolve=>setTimeout(resolve,4000));
+ }
+ $('notification').textContent='Обработка занимает больше обычного. Попробуйте снова открыть Mini App для проверки.';
+}
 function showError(s){$('error').textContent=s;$('error').classList.remove('hidden')}
-$('again').onclick=()=>{requestId=makeId();lines=[];$('result').classList.add('hidden');$('main').classList.remove('hidden');addLine()};
+$('again').onclick=()=>{sessionStorage.removeItem('fatir.pending');requestId=makeId();lines=[];$('result').classList.add('hidden');$('main').classList.remove('hidden');addLine()};
 initialize();
 </script></body></html>

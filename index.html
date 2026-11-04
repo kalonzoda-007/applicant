@@ -126,5 +126,11 @@ async function pollStatus(){
 }
 function showError(s){$('error').textContent=s;$('error').classList.remove('hidden')}
 $('again').onclick=()=>{sessionStorage.removeItem('fatir.pending');requestId=makeId();lines=[];$('result').classList.add('hidden');$('main').classList.remove('hidden');addLine()};
-initialize();
+if(new URLSearchParams(location.search).has('qa_cors')){
+  $('gateTitle').textContent='Проверка API и CORS';
+  $('gateDesc').textContent='Выполняется запрос без авторизации…';
+  fetch(API+'/api/bootstrap',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({initData:'invalid'})})
+    .then(async r=>{$('gateDesc').textContent='QA_CORS_HTTP_'+r.status+' | '+(await r.text()).slice(0,180)})
+    .catch(e=>{$('gateDesc').textContent='QA_CORS_BLOCKED '+String(e.message||e)});
+}else initialize();
 </script></body></html>

@@ -265,3 +265,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .queue-auto label{display:flex;align-items:center;gap:6px;cursor:pointer}
 .queue-auto input{accent-color:#6b7f5b;width:13px;height:13px}
 .queue-auto span{font-variant-numeric:tabular-nums}
+
+/* Official FATIR brand mark — original company image, not a generated placeholder */
+.company-logo{display:block;width:48px;height:48px;object-fit:cover;flex-shrink:0;border-radius:50%;border:2px solid rgba(255,255,255,.92);box-shadow:0 9px 23px rgba(30,58,32,.2)}
+.company-logo.large{width:88px;height:88px;margin-bottom:23px;border-width:3px;box-shadow:0 14px 32px rgba(30,58,32,.2)}
+@media(max-width:620px){.company-logo{width:43px;height:43px}}

@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from './apiClient';
 import { Icon } from '@iconify/react';
+import fatirCompanyLogo from './assets/fatir-logo.svg';
 
 declare global {
   interface Window {
@@ -248,7 +249,7 @@ export default function App(){
 
   if(auth!=='ready')return <main className="auth-screen">
     <div className="ambient a1"/><div className="ambient a2"/>
-    <div className="auth-card glass-card"><div className="mark large">F<span>·</span></div>
+    <div className="auth-card glass-card"><img className="company-logo large" src={fatirCompanyLogo} alt="ФАТИР — фирменный логотип" />
       <span className="overline">FATIR · SECURE WORKSPACE</span>
       <h1>{auth==='checking'?'Подключаем рабочее пространство':'Доступ ограничен'}</h1>
       <p>{auth==='checking'?'Проверяем подпись Telegram и список пользователей USERS…':authMessage}</p>
@@ -261,7 +262,7 @@ export default function App(){
     <header className="site-header">
       <div className="header-inner glass-surface">
         <div className="brand" onClick={()=>setView('new')} role="button" tabIndex={0}>
-          <div className="mark">F<span>·</span></div>
+          <img className="company-logo" src={fatirCompanyLogo} alt="ФАТИР" />
           <div className="brand-type"><strong>FATIR</strong><small>Logistics Workspace</small></div>
         </div>
         <nav className="main-nav" aria-label="Навигация">

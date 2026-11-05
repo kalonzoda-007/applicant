@@ -275,7 +275,7 @@ export default function App(){
     if(unchanged){setDiscussionError('Состав не изменился. Измените хотя бы одну позицию.');return}
     setActionBusy(true);setDiscussionError('');setDiscussionMessage('');
     try{
-      await postV2({action:'propose',orderId:selected,eventId:'ev_'+key(),reason:proposalReason.trim(),
+      await postV2({action:'propose',orderId:selected,eventId:'ev_v2_'+key(),reason:proposalReason.trim(),
         items:draftLines.map(x=>({itemId:x.itemId||'NEW-'+x.key,productCode:x.productCode,plant:x.plant,quantity:Number(x.quantity)}))});
       setDiscussionMessage('Предложение сохранено: товары и заводы изменятся только после согласования заявщиком и отдельного применения логистом.');
       setProposalOpen(false);setProposalReason('');await loadDetail(selected);haptic();

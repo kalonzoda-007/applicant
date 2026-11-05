@@ -1,4 +1,4 @@
-name: FATIR Applicant GitHub Pages
+name: FATIR Liquid Glass GitHub Pages
 on:
   push:
     branches: [main]
@@ -18,11 +18,14 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - name: Prepare files
-        run: |
-          mkdir -p dist
-          cp index.html dist/index.html
-          touch dist/.nojekyll
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build React app
+        run: npm run build
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

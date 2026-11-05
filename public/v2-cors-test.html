@@ -1,0 +1,6 @@
+<!doctype html><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FATIR V2 QA CORS</title><main style="font:16px system-ui;padding:28px"><h1>FATIR QA — связь GitHub / n8n</h1><p id="result">Проверяется…</p></main><script>
+fetch('https://fatir-agro.app.n8n.cloud/webhook/fatir-discussion-v2-20261105-Ny3J3Az2eLo5s4QbF68',{
+method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},
+body:JSON.stringify({initData:'INVALID_TEST_'+('0'.repeat(160)),orderId:'ORD-2026-000001',action:'list'})
+}).then(async r=>{document.getElementById('result').textContent='V2_HTTP_'+r.status+' '+(await r.text()).slice(0,200)}).catch(e=>{document.getElementById('result').textContent='V2_CORS_BLOCKED '+e.message});
+</script>

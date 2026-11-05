@@ -236,3 +236,20 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .dialog-card strong{color:#34583a}
 .dialog-buttons{display:flex;justify-content:flex-end;gap:10px;margin-top:24px;flex-wrap:wrap}
 @media(max-width:620px){.dialog-card{padding:25px 19px}.dialog-buttons{flex-direction:column}.dialog-buttons>button{width:100%}}
+
+/* Audit recovery and explicit old/new proposal comparisons */
+.audit-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.audit-controls>span{font-size:10px;color:#869981}
+.proposal-summary{display:block;padding:11px 0}
+.proposal-current{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:11px}
+.proposal-current>span{color:#607c5f;min-width:0;flex:1}
+.proposal-current>b{color:#37583e;flex-shrink:0}
+.proposal-changed{background:rgba(229,239,221,.53);border-radius:12px;padding:12px;margin:5px -3px}
+.proposal-compare{display:flex;align-items:center;gap:10px;margin-top:10px;padding-top:10px;border-top:1px dashed #cad7c3}
+.proposal-prior,.proposal-after{display:flex;flex-direction:column;flex:1;min-width:0;gap:5px}
+.proposal-prior small,.proposal-after small{font-size:8px;letter-spacing:1.1px;font-weight:800;color:#97a295}
+.proposal-prior span{font-size:10px;color:#9a857b;line-height:1.5}
+.proposal-after span{font-size:10px;color:#4c774f;font-weight:800;line-height:1.5}
+.compare-arrow{display:grid;place-items:center;flex-shrink:0;color:#79a079}
+.proposal-archive-hint{font-size:10px!important;color:#aa8c6a!important;margin:10px 0 0!important}
+@media(max-width:620px){.audit-controls{gap:6px}.audit-controls>span{display:none}.proposal-compare{gap:5px}.proposal-prior span,.proposal-after span{font-size:9px}}

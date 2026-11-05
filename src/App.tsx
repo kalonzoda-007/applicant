@@ -84,6 +84,8 @@ export default function App(){
   const [selected,setSelected]=useState('');
   const [detail,setDetail]=useState<Detail|null>(null);
   const [listBusy,setListBusy]=useState(false);
+  const [queueRefreshedAt,setQueueRefreshedAt]=useState<Date|null>(null);
+  const [queueAutoRefresh,setQueueAutoRefresh]=useState(true);
   const [detailBusy,setDetailBusy]=useState(false);
   const [discussionError,setDiscussionError]=useState('');
   const [discussionMessage,setDiscussionMessage]=useState('');
@@ -135,7 +137,7 @@ export default function App(){
   },[auth,result?.pending,result?.requestId,post]);
   const loadOrders=useCallback(async()=>{
     setListBusy(true);setDiscussionError('');
-    try{const d=await post('/api/discussions/list');setOrders(d.orders||[])}
+    try{const d=await post('/api/discussions/list');setOrders(d.orders||[]);setQueueRefreshedAt(new Date())}
     catch(e:any){setDiscussionError(e?.response?.data?.error||e.message||'Не удалось загрузить очередь')}
     finally{setListBusy(false)}
   },[post]);
@@ -148,6 +150,14 @@ export default function App(){
   },[post]);
   useEffect(()=>{if(auth==='ready'&&view==='inbox')loadOrders()},[auth,view,loadOrders]);
   useEffect(()=>{if(auth==='ready'&&view==='inbox'&&selected)loadDetail(selected)},[auth,view,selected,loadDetail]);
+  useEffect(()=>{
+    if(auth!=='ready'||view!=='inbox'||!queueAutoRefresh)return;
+    const timer=window.setInterval(()=>{
+      if(document.visibilityState!=='visible')return;
+      post('/api/discussions/list').then(d=>{setOrders(d.orders||[]);setQueueRefreshedAt(new Date())}).catch(()=>{});
+    },45000);
+    return ()=>window.clearInterval(timer);
+  },[auth,view,queueAutoRefresh,post]);
   const totalBags=lines.reduce((sum,l)=>sum+(Number(l.quantity)||0),0);
   const totalWeight=lines.reduce((sum,l)=>sum+(products.find(p=>p.code===l.productCode)?.weight||0)*(Number(l.quantity)||0),0);
   const updateLine=(id:string,patch:Partial<Line>)=>setLines(arr=>arr.map(l=>l.key===id?{...l,...patch}:l));
@@ -168,8 +178,11 @@ export default function App(){
     finally{setBusy(false)}
   };
   const reset=()=>{remember('fatir.pending',null);setResult(null);setClientId('');setClientName('');setCity('');setAddress('');setLines([firstLine()]);setNotes('');setDeliveryType('Самовывоз');setRequestId(key())};
+  const statusPriority:Record<string,number>={DISCUSSION:0,NEEDS_REVIEW:1,DRAFT:2,CONFIRMED:3,REJECTED:4,CANCELLED:5,SHIPPED:6,COMPLETED:7};
+  const queueCounts=useMemo(()=>({all:orders.length,discussion:orders.filter(o=>o.status==='DISCUSSION').length,review:orders.filter(o=>o.status==='NEEDS_REVIEW').length,new:orders.filter(o=>o.status==='DRAFT').length}),[orders]);
   const allFiltered=useMemo(()=>orders.filter(o=>(filter==='ALL'||o.status===filter)&&
-    (o.orderId+' '+o.clientName+' '+o.city).toLowerCase().includes(orderSearch.toLowerCase())),[orders,filter,orderSearch]);
+    (o.orderId+' '+o.clientName+' '+o.city).toLowerCase().includes(orderSearch.toLowerCase()))
+    .sort((a,b)=>(statusPriority[a.status]??8)-(statusPriority[b.status]??8)||String(b.updatedAt||'').localeCompare(String(a.updatedAt||''))),[orders,filter,orderSearch]);
   const postAction=async(endpoint:string,payload:Record<string,unknown>)=>{
     if(!selected)return;
     setActionBusy(true);setDiscussionError('');setDiscussionMessage('');
@@ -358,9 +371,11 @@ export default function App(){
       </section>
       <div className="workspace">
         <aside className={'queue glass-card '+(selected?'queue-mobile-hide':'')}>
-          <div className="queue-head"><div><span className="overline">РАБОЧАЯ ОЧЕРЕДЬ</span><h2>Заявки <span>{orders.length}</span></h2></div>
+          <div className="queue-head"><div><span className="overline">РАБОЧАЯ ОЧЕРЕДЬ</span><h2>Заявки <span>{queueCounts.all}</span></h2></div>
             <button title="Обновить" className="icon-button" onClick={loadOrders}>{ico('refresh-circle-linear',20)}</button></div>
+          <div className="queue-dashboard"><div><strong>{queueCounts.discussion}</strong><span>Обсуждение</span></div><div><strong>{queueCounts.review}</strong><span>Проверить</span></div><div><strong>{queueCounts.new}</strong><span>Новые</span></div></div>
           <div className="queue-search">{ico('magnifer-linear',19)}<input placeholder="Поиск ORD, клиента, города..." value={orderSearch} onChange={e=>setOrderSearch(e.target.value)}/></div>
+          <div className="queue-auto"><label><input type="checkbox" checked={queueAutoRefresh} onChange={e=>setQueueAutoRefresh(e.target.checked)}/> Обновлять каждые 45 с</label><span>{queueRefreshedAt?'Обновлено '+queueRefreshedAt.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}):'Ожидание'}</span></div>
           <div className="filters">
             {[['ALL','Все'],['DISCUSSION','Обсуждение'],['NEEDS_REVIEW','Проверить'],['DRAFT','Новые']].map(([val,label])=>
               <button key={val} className={filter===val?'on':''} onClick={()=>setFilter(val)}>{label}</button>)}

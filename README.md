@@ -1,19 +1,40 @@
-# FATIR · Заявщик — Telegram Mini App
+# FATIR · Liquid Glass Workspace
 
-Рабочее приложение: https://fatir-mini-app-j17de2.v2.appdeploy.ai/
+**Рабочая версия в Telegram Mini App:** https://fatir-mini-app-j17de2.v2.appdeploy.ai/
 
-Планируемый GitHub Pages: https://kalonzoda-007.github.io/applicant/
+**Та же React-версия на GitHub Pages:** https://kalonzoda-007.github.io/applicant/
 
-**Доступ:** откройте вашего FATIR-бота в Telegram, отправьте /app или /start и нажмите кнопку «📲 Открыть FATIR · Заявщик». Обычная ссылка вне Telegram не передаёт авторизацию.
+Доступ возможен после запуска **из Telegram**: откройте своего FATIR-бота, отправьте `/app` или `/start` и нажмите «Открыть FATIR». Приложение проверяет на сервере подпись Telegram и активный `telegram_id` из листа `USERS`.
 
-Список разрешённых пользователей: https://docs.google.com/spreadsheets/d/1A449UaomSnY0VeqjX2-j4PiCsqbJ7VVchO1Xp3uHWtM/edit
+## Функции
 
-Лист USERS: telegram_id, full_name, username, role, active, region, notes. Роль applicant, requester, logistic или admin. Для разрешения укажите active=TRUE. Для отключения — active=FALSE.
+- Заявщик: клиент, многотоварный заказ, заводы, количество, суммарная масса, доставка или самовывоз.
+- Логист: очередь ORD, поиск по номеру/клиенту, статусы, товары и история.
+- Обсуждение: вопрос заявщику, ответ, внутренняя заметка, проект корректировки.
+- Двухэтапное согласование: логист предлагает → заявщик принимает/отклоняет → логист применяет через подтверждающее модальное окно.
+- Backend проверяет полномочия, SKU, завод, количества, версию заказа; не допускает самосогласование и беззвучные изменения.
+- События сохраняются в серверной БД AppDeploy и отражаются в Google Sheets; об успешности синхронизации сообщается отдельно.
+- После корректировки отправляется новая карточка в Telegram-канал логистов с пометкой, что прежняя устарела.
 
-Общая база заказов: https://docs.google.com/spreadsheets/d/19DQVv-n-678oIxwXuHcEnbAAq-dy9irtj4lBmmFkyvE/edit
+**Реестр доступа:** https://docs.google.com/spreadsheets/d/1A449UaomSnY0VeqjX2-j4PiCsqbJ7VVchO1Xp3uHWtM/edit
 
-Проверка подписи Telegram initData, ролей, товаров и запись ORD выполняются только сервером AppDeploy и n8n Google OAuth. Публичный GitHub хранит только статический интерфейс; секреты и список пользователей не публикуются.
+**Основная база:** https://docs.google.com/spreadsheets/d/19DQVv-n-678oIxwXuHcEnbAAq-dy9irtj4lBmmFkyvE/edit
 
-**Однократное включение GitHub Pages владельцем:** https://github.com/kalonzoda-007/applicant/settings/pages → Build and deployment → Source → GitHub Actions. Workflow .github/workflows/pages.yml уже настроен. До включения GitHub Pages адрес github.io может отвечать 404.
+## Архитектура
 
-Заказы новых клиентов получают NEEDS_REVIEW и требуют проверки логиста. Не использовать тестовые заявки для отгрузки.
+- Frontend: React 19, TypeScript, Vite, адаптивный Liquid Glass, палитра `#2E3A2F`, `#6B7F5B`, `#F8F6EE`.
+- Иконки: Solar by 480 Design через Iconify, коллекция на https://iconbuddy.com/solar — CC BY 4.0, автор указан в интерфейсе.
+- Backend: AppDeploy, подписанный Telegram initData, авторизация по USERS и роли.
+- Данные и автоматизация: n8n + Google Sheets OAuth + встроенная БД AppDeploy для событий обсуждения.
+- GitHub Pages: `.github/workflows/pages.yml` собирает текущий React frontend через Vite. `src/apiClient.ts` отправляет запросы только защищённому API AppDeploy. **В репозитории нет серверных секретов.**
+
+## Порядок проверки
+
+1. Запустите Mini App через Telegram-бота с активным Telegram ID в USERS.
+2. Создайте тестовую заявку без реальной отгрузки.
+3. Логист в канале нажимает «Обсудить», получает личную кнопку и открывает ORD.
+4. Логист отправляет вопрос и предлагает изменение.
+5. **Другой** разрешённый Telegram-пользователь, владелец заявки, согласует предложение.
+6. Логист отдельно применяет поправку; проверьте изменение в Google Sheets и обновлённую карточку канала.
+
+**Внимание:** для промышленной эксплуатации n8n входящие webhook нужно дополнительно защитить Header Auth и перейти на транзакционную БД для высокопараллельных ORD. Двухпользовательский сценарий согласования ещё требует испытания на реальных разрешённых Telegram-аккаунтах.

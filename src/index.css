@@ -253,3 +253,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .compare-arrow{display:grid;place-items:center;flex-shrink:0;color:#79a079}
 .proposal-archive-hint{font-size:10px!important;color:#aa8c6a!important;margin:10px 0 0!important}
 @media(max-width:620px){.audit-controls{gap:6px}.audit-controls>span{display:none}.proposal-compare{gap:5px}.proposal-prior span,.proposal-after span{font-size:9px}}
+
+/* FATIR operational queue: Liquid Glass counters and background refresh controls */
+.queue-dashboard{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:4px 16px 13px}
+.queue-dashboard>div{display:flex;flex-direction:column;gap:3px;padding:12px 9px;border-radius:13px;background:rgba(237,244,230,.82);border:1px solid rgba(255,255,255,.86);text-align:center}
+.queue-dashboard strong{font-size:19px;line-height:1.2;color:#395c43;font-weight:800;font-variant-numeric:tabular-nums}
+.queue-dashboard span{font-size:9px;color:#7a9275;font-weight:700}
+.queue-dashboard>div:first-child strong{color:#806ca8}
+.queue-dashboard>div:nth-child(2) strong{color:#ac853d}
+.queue-auto{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 16px 12px;font-size:9px;color:#7a9073}
+.queue-auto label{display:flex;align-items:center;gap:6px;cursor:pointer}
+.queue-auto input{accent-color:#6b7f5b;width:13px;height:13px}
+.queue-auto span{font-variant-numeric:tabular-nums}

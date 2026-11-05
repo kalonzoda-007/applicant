@@ -19,7 +19,7 @@ declare global {
 type User = {id:string; name:string; role:string};
 type Product = {code:string;name:string;weight:number;unit:string;aliases?:string[]};
 type Client = {code:string;name:string;region:string;city:string;active:boolean};
-type Line = {key:string; productCode:string; quantity:number;plant:string};
+type Line = {key:string; itemId?:string; productCode:string; quantity:number;plant:string};
 type Order = {
   orderId:string; clientId:string;clientName:string;status:string;reviewReason:string;
   region:string;city:string;address:string;deliveryDate:string;deliveryType:string;
@@ -30,7 +30,7 @@ type OrderLine = {itemId:string;productCode:string;productName:string;quantity:n
 type RecordEvent = {
  id:string;kind:string;createdAt:string;actorId:string;actorName:string;role:string;
  text:string;status?:string;reason?:string;items?:OrderLine[];decidedBy?:string;decisionNote?:string;decidedAt?:string;
- baseVersion?:number;auditSynced?:boolean;
+ baseVersion?:number;auditSynced?:boolean;v2?:boolean;
 };
 type Detail = {order:Order;items:OrderLine[];timeline:RecordEvent[];canEdit:boolean;isRequester:boolean};
 type Result = {pending?:boolean;requestId?:string;orderId?:string;clientId?:string;status?:string;requiresReview?:boolean};
@@ -42,6 +42,7 @@ const statuses:Record<string,{label:string;className:string}>={
   DISCUSSION:{label:'Обсуждение',className:'discussion'},
   CONFIRMED:{label:'Подтверждена',className:'confirmed'},
   REJECTED:{label:'Отклонена',className:'danger'},
+  APPLIED:{label:'Применено',className:'confirmed'},
   CANCELLED:{label:'Отменена',className:'danger'},
 };
 const key=()=>crypto.randomUUID().replaceAll('-','');
@@ -106,6 +107,13 @@ export default function App(){
     const res=await api.post(path,{...payload,initData});
     return res.data;
   },[initData]);
+  const postV2=useCallback(async(payload:Record<string,unknown>,apply=false)=>{
+    const endpoint=apply?'https://fatir-agro.app.n8n.cloud/webhook/fatir-discussion-v2-apply-20261105-QSp8D4NvK7':'https://fatir-agro.app.n8n.cloud/webhook/fatir-discussion-v2-20261105-Ny3J3Az2eLo5s4QbF68';
+    const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({...payload,initData})});
+    const data=await response.json().catch(()=>({ok:false,error:'Некорректный ответ n8n'}));
+    if(!response.ok||!data?.ok)throw new Error(data?.error||'Не удалось выполнить запрос изменений');
+    return data;
+  },[initData]);
   useEffect(()=>{
     const tg=window.Telegram?.WebApp;
     if(!tg?.initData){setAuth('denied');setAuthMessage('Откройте Mini App через кнопку FATIR-бота в Telegram. Обычная ссылка не передаёт данные авторизации.');return}
@@ -145,10 +153,17 @@ export default function App(){
   const loadDetail=useCallback(async(id:string)=>{
     if(!id)return;
     setDetailBusy(true);setDiscussionError('');
-    try{const d=await post('/api/discussions/get',{orderId:id});setDetail(d);setSelected(id)}
+    try{
+      const d=await post('/api/discussions/get',{orderId:id});
+      let extra:RecordEvent[]=[];
+      try{const v2=await postV2({action:'list',orderId:id});extra=Array.isArray(v2.proposals)?v2.proposals:[]}
+      catch{setDiscussionMessage('История структурных изменений временно недоступна. Попробуйте обновить карточку.');}
+      setDetail({...d,timeline:[...(d.timeline||[]),...extra].sort((a:RecordEvent,b:RecordEvent)=>String(a.createdAt).localeCompare(String(b.createdAt)))});
+      setSelected(id)
+    }
     catch(e:any){setDiscussionError(e?.response?.data?.error||e.message||'Не удалось открыть заказ')}
     finally{setDetailBusy(false)}
-  },[post]);
+  },[post,postV2]);
   useEffect(()=>{if(auth==='ready'&&view==='inbox')loadOrders()},[auth,view,loadOrders]);
   useEffect(()=>{if(auth==='ready'&&view==='inbox'&&selected)loadDetail(selected)},[auth,view,selected,loadDetail]);
   useEffect(()=>{
@@ -220,7 +235,9 @@ export default function App(){
     if(!applyTarget||!selected)return;
     setActionBusy(true);setDiscussionError('');setDiscussionMessage('');
     try{
-      const d=await post('/api/discussions/apply',{orderId:selected,proposalId:applyTarget.id,eventId:key()});
+      const d=applyTarget.v2
+        ?await postV2({orderId:selected,proposalId:applyTarget.id},true)
+        :await post('/api/discussions/apply',{orderId:selected,proposalId:applyTarget.id,eventId:key()});
       if(!d.ok)throw Error('Сервер не подтвердил применение корректировки');
       setApplyTarget(null);
       setDiscussionMessage('Корректировка применена к '+selected+'. Актуальный статус: '+d.status+'.'+(d.auditSynced===false?' Требуется проверка синхронизации журнала Google Sheets.':'')+(d.channelNotified===false?' Канал логистов не получил обновлённую карточку — уведомите логиста вручную.':''));
@@ -229,17 +246,41 @@ export default function App(){
     }catch(e:any){setDiscussionError(e?.response?.data?.error||e?.message||'Не удалось применить корректировку');setApplyTarget(null)}
     finally{setActionBusy(false)}
   };
+  const decideV2=async(proposalId:string,approve:boolean)=>{
+    if(!selected)return;
+    setActionBusy(true);setDiscussionError('');
+    try{
+      await postV2({action:'decide',orderId:selected,proposalId,approve});
+      setDiscussionMessage(approve?'Предложение согласовано. Ожидается отдельное применение логистом.':'Предложение отклонено без изменения ORD.');
+      await loadDetail(selected);haptic();
+    }catch(e:any){setDiscussionError(e?.message||'Не удалось сохранить решение')}
+    finally{setActionBusy(false)}
+  };
   const openProposal=()=>{
     if(!detail)return;
-    setDraftLines(detail.items.map(x=>({key:key(),productCode:x.productCode,plant:x.plant||'',quantity:x.quantity})));
-    setProposalReason('');setProposalOpen(true);
+    setDraftLines(detail.items.map(x=>({key:key(),itemId:x.itemId,productCode:x.productCode,plant:x.plant||'',quantity:x.quantity})));
+    setProposalReason('');setProposalOpen(true);setDiscussionError('');
   };
-  const submitProposal=()=>{
-    if(proposalReason.trim().length<5){setDiscussionError('Объясните причину корректировки (от 5 символов).');return}
-    if(draftLines.some(x=>!x.productCode||!x.plant||!Number.isSafeInteger(Number(x.quantity))||x.quantity<1)){
-      setDiscussionError('Проверьте каждый товар, завод и количество.');return;
+  const draftTotal=useMemo(()=>draftLines.reduce((sum,x)=>sum+(products.find(p=>p.code===x.productCode)?.weight||0)*Math.max(0,Number(x.quantity)||0),0),[draftLines,products]);
+  const draftBagCount=useMemo(()=>draftLines.reduce((sum,x)=>sum+Math.max(0,Number(x.quantity)||0),0),[draftLines]);
+  const submitProposal=async()=>{
+    if(!selected||!detail)return;
+    if(proposalReason.trim().length<5){setDiscussionError('Укажите причину изменений (не менее 5 символов).');return}
+    if(!draftLines.length||draftLines.length>30||draftLines.some(x=>!x.productCode||!x.plant||!Number.isSafeInteger(Number(x.quantity))||x.quantity<1||x.quantity>100000)){
+      setDiscussionError('Проверьте товар, завод и количество; должен остаться хотя бы один товар.');return;
     }
-    postAction('/api/discussions/propose',{reason:proposalReason,items:draftLines.map(x=>({productCode:x.productCode,plant:x.plant,quantity:x.quantity}))});
+    const unchanged=draftLines.length===detail.items.length&&draftLines.every((x,i)=>{
+      const old=detail.items[i];return old&&x.itemId===old.itemId&&x.productCode===old.productCode&&x.plant===old.plant&&Number(x.quantity)===Number(old.quantity);
+    });
+    if(unchanged){setDiscussionError('Состав не изменился. Измените хотя бы одну позицию.');return}
+    setActionBusy(true);setDiscussionError('');setDiscussionMessage('');
+    try{
+      await postV2({action:'propose',orderId:selected,eventId:'ev_'+key(),reason:proposalReason.trim(),
+        items:draftLines.map(x=>({itemId:x.itemId||'NEW-'+x.key,productCode:x.productCode,plant:x.plant,quantity:Number(x.quantity)}))});
+      setDiscussionMessage('Предложение сохранено: товары и заводы изменятся только после согласования заявщиком и отдельного применения логистом.');
+      setProposalOpen(false);setProposalReason('');await loadDetail(selected);haptic();
+    }catch(e:any){setDiscussionError(e?.message||'Не удалось передать предложение')}
+    finally{setActionBusy(false)}
   };
   const deliveryLabels=<div className="switcher">
     {(['Самовывоз','Доставка'] as const).map(type=><button type="button" key={type}

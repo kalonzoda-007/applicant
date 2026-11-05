@@ -270,3 +270,19 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .company-logo{display:block;width:48px;height:48px;object-fit:cover;flex-shrink:0;border-radius:50%;border:2px solid rgba(255,255,255,.92);box-shadow:0 9px 23px rgba(30,58,32,.2)}
 .company-logo.large{width:88px;height:88px;margin-bottom:23px;border-width:3px;box-shadow:0 14px 32px rgba(30,58,32,.2)}
 @media(max-width:620px){.company-logo{width:43px;height:43px}}
+
+/* FATIR discussion revision: transparent add/remove/transfer controls */
+.revision-type{margin-left:auto;padding:5px 9px;border-radius:9px;background:#e8eee4;border:1px solid #fff;color:#668263;font-size:9px;font-weight:800}
+.revision-type.is-new{background:#dcf1df;color:#468652}
+.line-top .revision-type + .icon-button{margin-left:0}
+.removed-item{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:12px 14px;margin-top:8px;color:#ab6259;border-radius:12px;background:#fff0ed;border:1px solid #f0dbd7;font-size:11px}
+.removed-item b{color:#9a4b43}
+.revision-preview{display:grid;grid-template-columns:minmax(0,1fr) 26px minmax(0,1fr);align-items:center;gap:10px;padding:15px 14px;margin:18px 0 12px;border-radius:16px;background:linear-gradient(110deg,rgba(233,241,226,.88),rgba(248,251,243,.92));border:1px solid #fff}
+.revision-preview>div{display:flex;flex-direction:column;gap:5px;min-width:0}
+.revision-preview>div:last-child{text-align:right}
+.revision-preview>div span{color:#7c9275;font-size:10px}
+.revision-preview>div b{font-size:12px;white-space:normal;color:#314d37}
+.revision-preview>span{display:flex;justify-content:center;color:#759170}
+.proposal-editor .line-top{align-items:center}
+.proposal-editor>.btn-dashed{margin-top:13px}
+@media(max-width:620px){.revision-preview{padding:12px 9px;gap:5px}.revision-preview>div b{font-size:10px}.revision-type{font-size:8px;padding:5px 6px}}

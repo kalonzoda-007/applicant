@@ -29,6 +29,7 @@ type OrderLine = {itemId:string;productCode:string;productName:string;quantity:n
 type RecordEvent = {
  id:string;kind:string;createdAt:string;actorId:string;actorName:string;role:string;
  text:string;status?:string;reason?:string;items?:OrderLine[];decidedBy?:string;decisionNote?:string;decidedAt?:string;
+ baseVersion?:number;auditSynced?:boolean;
 };
 type Detail = {order:Order;items:OrderLine[];timeline:RecordEvent[];canEdit:boolean;isRequester:boolean};
 type Result = {pending?:boolean;requestId?:string;orderId?:string;clientId?:string;status?:string;requiresReview?:boolean};
@@ -92,6 +93,8 @@ export default function App(){
   const [draftLines,setDraftLines]=useState<Line[]>([]);
   const [proposalReason,setProposalReason]=useState('');
   const [actionBusy,setActionBusy]=useState(false);
+  const [auditBusy,setAuditBusy]=useState(false);
+  const [auditOffset,setAuditOffset]=useState(0);
   const [applyTarget,setApplyTarget]=useState<RecordEvent|null>(null);
   const initData=window.Telegram?.WebApp?.initData||'';
   const isLogist=['admin','logistic'].includes(user?.role||'');
@@ -183,6 +186,21 @@ export default function App(){
       haptic();
     }catch(e:any){setDiscussionError(e?.response?.data?.error||e?.message||'Не удалось сохранить действие')}
     finally{setActionBusy(false)}
+  };
+  const repairAudit=async()=>{
+    if(!selected||!isLogist)return;
+    setAuditBusy(true);setDiscussionError('');
+    try {
+      const d=await post('/api/discussions/repair-audit',{orderId:selected,offset:auditOffset});
+      setAuditOffset(d.nextOffset===null?0:Number(d.nextOffset||0));
+      setDiscussionMessage('Google Sheets: сверено '+d.repaired+' из '+d.processed+' событий.'+
+        (d.failed?' Ошибок: '+d.failed+'. Повторите позже.':'')+
+        (d.nextOffset===null?'':' Есть другие события — повторите сверку.'));
+      await loadDetail(selected);
+      haptic();
+    }catch(e:any){
+      setDiscussionError(e?.response?.data?.error||e?.message||'Синхронизация журнала недоступна');
+    }finally{setAuditBusy(false)}
   };
   const applyApproved=async()=>{
     if(!applyTarget||!selected)return;
@@ -351,7 +369,7 @@ export default function App(){
             {listBusy&&<div className="queue-empty">Обновляем список…</div>}
             {!listBusy&&!allFiltered.length&&<div className="queue-empty">{ico('box-linear',25)}<span>Заявок по фильтру нет</span></div>}
             {allFiltered.map(o=><button type="button" key={o.orderId} className={'queue-item '+(selected===o.orderId?'active':'')}
-              onClick={()=>{haptic();setSelected(o.orderId);setDetail(null);setProposalOpen(false)}}>
+              onClick={()=>{haptic();setSelected(o.orderId);setDetail(null);setProposalOpen(false);setAuditOffset(0)}}>
               <div className="queue-top"><b>{o.orderId}</b><span>{fmtTime(o.updatedAt)}</span></div>
               <div className="queue-client">{o.clientName||'Клиент не указан'}</div>
               <div className="queue-bottom"><Status value={o.status}/><span>{fmt(o.totalBags)} меш.</span></div>
@@ -384,17 +402,47 @@ export default function App(){
                 <div className="goods-mass"><b>{fmt(line.quantity*line.unitWeight)}</b><small>кг</small></div>
               </div>)}</div>
             </div>
-            <div className="desk-section"><div className="desk-title"><div>{ico('chat-line-linear',21)}<h3>Обсуждение и история</h3></div><span>{detail.timeline.length} событий</span></div>
+            <div className="desk-section"><div className="desk-title">
+                <div>{ico('chat-line-linear',21)}<h3>Обсуждение и история</h3></div>
+                <div className="audit-controls">
+                  <span>{detail.timeline.length} событий</span>
+                  {isLogist&&<button className="btn-light small" disabled={auditBusy} onClick={repairAudit}>
+                    {ico('refresh-circle-linear',16)} {auditBusy?'Сверяем…':'Сверить журнал'}
+                  </button>}
+                </div>
+              </div>
               {!detail.timeline.length&&<div className="conversation-empty">{ico('chat-round-dots-linear',24)}
                 <p>Пока нет сообщений. Логист может запросить уточнение или предложить корректировку.</p></div>}
               <div className="timeline">{detail.timeline.map(ev=><div className={'message '+(ev.actorId===user?.id?'mine':'')} key={ev.id}>
                 <div className="message-avatar">{ev.actorName?.charAt(0)||'F'}</div><div className="message-body">
-                  <div className="message-meta"><b>{ev.actorName||ev.role}</b><span>{fmtTime(ev.createdAt)}</span></div>
+                  <div className="message-meta"><b>{ev.actorName||ev.role}</b>
+                      <span>{fmtTime(ev.createdAt)}{ev.auditSynced===false?' · Журнал ждёт сверки':''}</span>
+                    </div>
                   {ev.kind==='PROPOSAL'?<div className="proposal-message">
                     <div className="proposal-header">{ico('document-add-linear',19)} Предложение по товарам <Status value={ev.status==='PENDING'?'DISCUSSION':ev.status==='ACCEPTED'?'CONFIRMED':'REJECTED'}/></div>
                     <p>{ev.reason||ev.text}</p>
-                    {ev.items?.map((li,i)=><div className="proposal-summary" key={i}>
-                      <span>{li.productName} · {plantName(li.plant)}</span><b>{fmt(li.quantity)} меш.</b></div>)}
+                    {ev.items?.map((li,i)=>{
+                      const previous=detail.items[i];
+                      const comparable=ev.baseVersion==null||Number(ev.baseVersion)===Number(detail.order.version);
+                      const changed=Boolean(comparable&&previous&&
+                        (previous.productCode!==li.productCode||previous.plant!==li.plant||previous.quantity!==li.quantity));
+                      return <div className={'proposal-summary '+(changed?'proposal-changed':'')} key={i}>
+                        <div className="proposal-current">
+                          <span>{li.productName} · {plantName(li.plant)}</span>
+                          <b>{fmt(li.quantity)} меш.</b>
+                        </div>
+                        {changed&&previous&&<div className="proposal-compare">
+                          <div className="proposal-prior"><small>БЫЛО</small>
+                            <span>{previous.productName} · {plantName(previous.plant)} · {fmt(previous.quantity)} меш.</span>
+                          </div>
+                          <span className="compare-arrow">{ico('arrow-right-linear',16)}</span>
+                          <div className="proposal-after"><small>ПРЕДЛОЖЕНО</small>
+                            <span>{li.productName} · {plantName(li.plant)} · {fmt(li.quantity)} меш.</span>
+                          </div>
+                        </div>}
+                        {!comparable&&<p className="proposal-archive-hint">Предложение предыдущей версии ORD — сравнение со старым составом недоступно.</p>}
+                      </div>;
+                    })}
                     {ev.status==='PENDING'&&detail.isRequester&&ev.actorId!==user?.id&&<div className="decision-actions">
                       <button className="btn-primary small" disabled={actionBusy} onClick={()=>postAction('/api/discussions/decision',{proposalId:ev.id,approve:true})}>{ico('check-circle-linear',18)} Согласовать</button>
                       <button className="btn-light small" disabled={actionBusy} onClick={()=>postAction('/api/discussions/decision',{proposalId:ev.id,approve:false})}>{ico('close-circle-linear',18)} Отклонить</button>

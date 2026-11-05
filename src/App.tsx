@@ -476,16 +476,15 @@ export default function App(){
                       <span>{fmtTime(ev.createdAt)}{ev.auditSynced===false?' · Журнал ждёт сверки':''}</span>
                     </div>
                   {ev.kind==='PROPOSAL'?<div className="proposal-message">
-                    <div className="proposal-header">{ico('document-add-linear',19)} Предложение по товарам <Status value={ev.status==='PENDING'?'DISCUSSION':ev.status==='ACCEPTED'?'CONFIRMED':'REJECTED'}/></div>
+                    <div className="proposal-header">{ico('document-add-linear',19)} Предложение по товарам <Status value={ev.status==='PENDING'?'DISCUSSION':ev.status==='ACCEPTED'?'CONFIRMED':ev.status==='APPLIED'?'APPLIED':'REJECTED'}/></div>
                     <p>{ev.reason||ev.text}</p>
                     {ev.items?.map((li,i)=>{
-                      const previous=detail.items[i];
+                      const previous=ev.v2?detail.items.find(x=>x.itemId===li.itemId):detail.items[i];
                       const comparable=ev.baseVersion==null||Number(ev.baseVersion)===Number(detail.order.version);
-                      const changed=Boolean(comparable&&previous&&
-                        (previous.productCode!==li.productCode||previous.plant!==li.plant||previous.quantity!==li.quantity));
+                      const changed=Boolean(comparable&&(!previous||previous.productCode!==li.productCode||previous.plant!==li.plant||previous.quantity!==li.quantity));
                       return <div className={'proposal-summary '+(changed?'proposal-changed':'')} key={i}>
                         <div className="proposal-current">
-                          <span>{li.productName} · {plantName(li.plant)}</span>
+                          <span>{!previous&&ev.v2?'＋ Новая позиция · ':''}{li.productName} · {plantName(li.plant)}</span>
                           <b>{fmt(li.quantity)} меш.</b>
                         </div>
                         {changed&&previous&&<div className="proposal-compare">
@@ -500,9 +499,11 @@ export default function App(){
                         {!comparable&&<p className="proposal-archive-hint">Предложение предыдущей версии ORD — сравнение со старым составом недоступно.</p>}
                       </div>;
                     })}
+                    {ev.v2&&ev.items&&Number(ev.baseVersion)===Number(detail.order.version)&&detail.items.filter(old=>!ev.items?.some(proposed=>proposed.itemId===old.itemId)).map(old=>
+                      <div className="removed-item" key={old.itemId}>{ico('trash-bin-trash-linear',18)} Исключить: <b>{old.productName}</b> · {fmt(old.quantity)} меш. · {plantName(old.plant)}</div>)}
                     {ev.status==='PENDING'&&detail.isRequester&&ev.actorId!==user?.id&&<div className="decision-actions">
-                      <button className="btn-primary small" disabled={actionBusy} onClick={()=>postAction('/api/discussions/decision',{proposalId:ev.id,approve:true})}>{ico('check-circle-linear',18)} Согласовать</button>
-                      <button className="btn-light small" disabled={actionBusy} onClick={()=>postAction('/api/discussions/decision',{proposalId:ev.id,approve:false})}>{ico('close-circle-linear',18)} Отклонить</button>
+                      <button className="btn-primary small" disabled={actionBusy} onClick={()=>ev.v2?decideV2(ev.id,true):postAction('/api/discussions/decision',{proposalId:ev.id,approve:true})}>{ico('check-circle-linear',18)} Согласовать</button>
+                      <button className="btn-light small" disabled={actionBusy} onClick={()=>ev.v2?decideV2(ev.id,false):postAction('/api/discussions/decision',{proposalId:ev.id,approve:false})}>{ico('close-circle-linear',18)} Отклонить</button>
                     </div>}
                     {ev.status==='ACCEPTED'&&<div className="apply-panel">
                       <p className="proposal-foot">{ico('info-circle-linear',17)} Заявщик согласовал предложенные изменения. Логист может применить их к ORD после проверки.</p>
@@ -531,17 +532,28 @@ export default function App(){
                 {draftLines.map((li,i)=>{
                   const prod=products.find(p=>p.code===li.productCode);
                   return <div className="line-card" key={li.key}><div className="line-top"><b>Позиция {i+1}</b>
-                    <span className="proposal-locked-count">{ico('lock-keyhole-linear',14)} Фиксированная позиция</span></div>
+                    <span className={'revision-type '+(li.itemId?.startsWith('NEW-')?'is-new':'')}>{li.itemId?.startsWith('NEW-')?'Новая':'Из заказа'}</span>
+                    <button type="button" className="icon-button danger-hover" title="Исключить позицию из предложенного состава"
+                      disabled={draftLines.length===1||actionBusy}
+                      onClick={()=>setDraftLines(v=>v.filter(x=>x.key!==li.key))}>{ico('trash-bin-trash-linear',19)}</button></div>
                     <div className="field"><label>Товар</label><select value={li.productCode} onChange={e=>setDraftLines(arr=>arr.map(x=>x.key===li.key?{...x,productCode:e.target.value}:x))}>
                       <option value="">Выберите товар</option>{products.map(p=><option value={p.code} key={p.code}>{p.name} · {p.code}</option>)}</select></div>
-                    <div className="field-grid"><div className="field"><label>Завод</label><select value={li.plant} onChange={e=>setDraftLines(arr=>arr.map(x=>x.key===li.key?{...x,plant:e.target.value}:x))}>
+                    <div className="field-grid"><div className="field"><label>Завод для отгрузки / перевода</label><select value={li.plant} onChange={e=>setDraftLines(arr=>arr.map(x=>x.key===li.key?{...x,plant:e.target.value}:x))}>
                       <option value="">Выбрать завод</option>{PLANTS.map(p=><option value={p.code} key={p.code}>{p.name}</option>)}</select></div>
                       <div className="field"><label>Мешки</label><input type="number" min="1" max="100000" value={li.quantity} onChange={e=>setDraftLines(arr=>arr.map(x=>x.key===li.key?{...x,quantity:Number(e.target.value)}:x))}/></div></div>
                     {prod&&<div className="line-footer">{prod.weight} кг за мешок<span>{fmt(prod.weight*li.quantity)} кг</span></div>}
                   </div>;
                 })}
-                <p className="notice-line">{ico('info-circle-linear',17)} В этой версии можно менять товар, завод и количество существующих позиций. Добавление и удаление строк требует отдельного согласования.</p>
-                <div className="field"><label>Причина исправления *</label><textarea value={proposalReason} onChange={e=>setProposalReason(e.target.value)} placeholder="Например: клиент подтвердил 40 вместо 50 мешков, другой завод..." rows={3}/></div>
+                <button type="button" className="btn-dashed" disabled={draftLines.length>=30||actionBusy}
+                  onClick={()=>setDraftLines(v=>[...v,{...firstLine(),itemId:'NEW-'+key()}])}>
+                  {ico('add-circle-linear',19)} Добавить позицию</button>
+                <div className="revision-preview">
+                  <div><span>До изменений</span><b>{fmt(detail.order.totalBags)} меш. · {fmt(detail.order.totalWeightKg)} кг</b></div>
+                  <span>{ico('arrow-right-linear',20)}</span>
+                  <div><span>После изменений</span><b>{fmt(draftBagCount)} меш. · {fmt(draftTotal)} кг</b></div>
+                </div>
+                <p className="notice-line">{ico('info-circle-linear',17)} Замена завода меняет источник планируемой отгрузки, но не перемещает физические остатки. После согласования склад проверяет наличие на выбранном заводе.</p>
+                <div className="field"><label>Причина исправления *</label><textarea value={proposalReason} onChange={e=>setProposalReason(e.target.value)} placeholder="Причина: добавить товар, убрать позицию, заменить сорт, изменить количество или отгружать с другого завода…" rows={3}/></div>
                 <button className="btn-primary" disabled={actionBusy} onClick={submitProposal}>{ico('plain-2-linear',19)} Отправить на согласование</button>
               </div>}
             </div>}
@@ -556,7 +568,7 @@ export default function App(){
         <div className="dialog-icon">{ico('shield-check-linear',30)}</div>
         <span className="overline">FATIR / КОНТРОЛЬ ИЗМЕНЕНИЙ</span>
         <h2 id="apply-title">Применить исправления?</h2>
-        <p>Будут обновлены товары и итоговая масса заказа <strong>{selected}</strong> в Google Sheets. Перед записью сервер проверит статус, версию ORD, полномочия логиста и официальные SKU.</p>
+        <p>Будут обновлены актуальные позиции, их заводы и итоговая масса заказа <strong>{selected}</strong> в Google Sheets. Исключённые позиции останутся в журнале с нулевым количеством. Перед записью проверяются статус, версия ORD, права логиста и официальные SKU. Физическое перемещение остатков здесь не выполняется.</p>
         <div className="dialog-buttons"><button className="btn-light" disabled={actionBusy} onClick={()=>setApplyTarget(null)}>Отмена</button>
           <button className="btn-primary" disabled={actionBusy} onClick={applyApproved}>{actionBusy?'Применяем…':'Подтвердить применение'} {ico('check-circle-linear',19)}</button></div>
       </div>

@@ -2,14 +2,22 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from './apiClient';
 import { Icon } from '@iconify/react';
+import fatirCompanyLogo from './assets/fatir-logo.png';
 
 declare global {
   interface Window {
     Telegram?: { WebApp?: {
       initData: string;
+      platform?:string;
+      colorScheme?:string;
       ready():void;
       expand():void;
-      colorScheme?:string;
+      setHeaderColor?(color:string):void;
+      setBackgroundColor?(color:string):void;
+      disableVerticalSwipes?():void;
+      enableClosingConfirmation?():void;
+      disableClosingConfirmation?():void;
+      BackButton?: { show():void; hide():void; onClick(cb:()=>void):void; offClick(cb:()=>void):void };
       HapticFeedback?: { impactOccurred(type:string):void; notificationOccurred(type:string):void };
     } };
   }
@@ -41,7 +49,11 @@ const statuses:Record<string,{label:string;className:string}>={
   CONFIRMED:{label:'Подтверждена',className:'confirmed'},
   REJECTED:{label:'Отклонена',className:'danger'},
   CANCELLED:{label:'Отменена',className:'danger'},
+  SHIPPED:{label:'Отгружена',className:'confirmed'},
+  COMPLETED:{label:'Завершена',className:'confirmed'},
 };
+const MAX_BAGS=100000;
+const clampBags=(v:number)=>Math.min(MAX_BAGS,Math.max(0,Math.trunc(Number(v)||0)));
 const key=()=>crypto.randomUUID().replaceAll('-','');
 const firstLine=():Line=>({key:key(),productCode:'',quantity:1,plant:''});
 const stored=(name:string)=>{try{return sessionStorage.getItem(name)||''}catch{return ''}};
@@ -49,7 +61,7 @@ const remember=(name:string,val:string|null)=>{try{val===null?sessionStorage.rem
 const currentTjDate=()=>{const p=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Dushanbe',day:'2-digit',month:'2-digit',year:'numeric'}).formatToParts(new Date());const part=(x:string)=>p.find(i=>i.type===x)?.value||'';return part('year')+'-'+part('month')+'-'+part('day')};
 const plantName=(id:string)=>PLANTS.find(p=>p.code===id)?.name||'Не выбран';
 const fmt=(v:number)=>Number(v||0).toLocaleString('ru-RU');
-const fmtTime=(iso:string)=>{try{return new Date(iso).toLocaleString('ru-RU',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Dushanbe'})}catch{return iso}};
+const fmtTime=(iso:string)=>{if(!iso)return '';const d=new Date(iso);if(Number.isNaN(d.getTime()))return '';try{return d.toLocaleString('ru-RU',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Dushanbe'})}catch{return ''}};
 const ico=(name:string,size=20)=><Icon icon={'solar:'+name} width={size} height={size} aria-hidden="true" />;
 function Status({value}:{value:string}){const s=statuses[value]||{label:value||'Неизвестно',className:'draft'};return <span className={'status status-'+s.className}><span className="status-dot"/>{s.label}</span>}
 function Warning({children}:{children:React.ReactNode}){return <div className="warning">{ico('danger-circle-linear',18)} <span>{children}</span></div>}
@@ -102,8 +114,11 @@ export default function App(){
   },[initData]);
   useEffect(()=>{
     const tg=window.Telegram?.WebApp;
+    const mobileDevice=['android','ios'].includes(tg?.platform||'');
+    document.documentElement.dataset.device=mobileDevice?'mobile':'desktop';
     if(!tg?.initData){setAuth('denied');setAuthMessage('Откройте Mini App через кнопку FATIR-бота в Telegram. Обычная ссылка не передаёт данные авторизации.');return}
     tg.ready();tg.expand();
+    try{tg.setHeaderColor?.('#F8F6EE');tg.setBackgroundColor?.('#F8F6EE');tg.disableVerticalSwipes?.()}catch{}
     post('/api/bootstrap').then((d)=>{
       setUser(d.user);setProducts(d.products||[]);setClients(d.clients||[]);
       setAuth('ready');
@@ -145,6 +160,22 @@ export default function App(){
   },[post]);
   useEffect(()=>{if(auth==='ready'&&view==='inbox')loadOrders()},[auth,view,loadOrders]);
   useEffect(()=>{if(auth==='ready'&&view==='inbox'&&selected)loadDetail(selected)},[auth,view,selected,loadDetail]);
+  // Нативная кнопка «Назад» Telegram на телефоне: из карточки заявки обратно к списку.
+  useEffect(()=>{
+    const bb=window.Telegram?.WebApp?.BackButton;
+    if(!bb||auth!=='ready'||view!=='inbox'||!selected||!window.matchMedia('(max-width:620px)').matches)return;
+    const back=()=>{setSelected('');setDetail(null);setProposalOpen(false)};
+    bb.onClick(back);bb.show();
+    return ()=>{bb.offClick(back);bb.hide()};
+  },[auth,view,selected]);
+  // Предупреждение Telegram при закрытии, если форма заявки заполнена и не отправлена.
+  const formDirty=Boolean(auth==='ready'&&view==='new'&&!result&&(clientId||clientName.trim()||city.trim()||address.trim()||notes.trim()||lines.some(l=>l.productCode)));
+  useEffect(()=>{
+    const tg=window.Telegram?.WebApp;
+    if(!tg)return;
+    if(formDirty)tg.enableClosingConfirmation?.();else tg.disableClosingConfirmation?.();
+    return ()=>tg.disableClosingConfirmation?.();
+  },[formDirty]);
   const totalBags=lines.reduce((sum,l)=>sum+(Number(l.quantity)||0),0);
   const totalWeight=lines.reduce((sum,l)=>sum+(products.find(p=>p.code===l.productCode)?.weight||0)*(Number(l.quantity)||0),0);
   const updateLine=(id:string,patch:Partial<Line>)=>setLines(arr=>arr.map(l=>l.key===id?{...l,...patch}:l));
@@ -152,8 +183,9 @@ export default function App(){
     haptic();setErrorText('');
     if(!clientId&&!clientName.trim()){setErrorText('Выберите клиента или заполните имя нового.');return}
     if(!city.trim()||!deliveryDate){setErrorText('Укажите город и дату отгрузки.');return}
-    if(!lines.length||lines.some(x=>!x.productCode||!x.plant||!Number.isSafeInteger(Number(x.quantity))||x.quantity<1)){
-      setErrorText('Проверьте товар, количество и завод для каждой позиции.');return;
+    if(deliveryDate<currentTjDate()){setErrorText('Дата отгрузки не может быть в прошлом.');return}
+    if(!lines.length||lines.some(x=>!x.productCode||!x.plant||!Number.isSafeInteger(Number(x.quantity))||x.quantity<1||x.quantity>MAX_BAGS)){
+      setErrorText('Проверьте товар, количество (от 1 до '+fmt(MAX_BAGS)+') и завод для каждой позиции.');return;
     }
     setBusy(true);
     try{
@@ -229,8 +261,9 @@ export default function App(){
     <div className="ambient a1"/><div className="ambient a2"/><div className="ambient a3"/>
     <header className="site-header">
       <div className="header-inner glass-surface">
-        <div className="brand" onClick={()=>setView('new')} role="button" tabIndex={0}>
-          <div className="mark">F<span>·</span></div>
+        <div className="brand" onClick={()=>setView('new')} role="button" tabIndex={0}
+          onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();setView('new')}}}>
+          <img className="company-logo" src={fatirCompanyLogo} alt="ФАТИР" />
           <div className="brand-type"><strong>FATIR</strong><small>Logistics Workspace</small></div>
         </div>
         <nav className="main-nav" aria-label="Навигация">
@@ -262,6 +295,7 @@ export default function App(){
           'Номер клиента: '+result.clientId+'. '+(result.requiresReview?'Нужно согласование нового клиента.':'Логистика получила заявку.')}</p>
         {pollError&&<Warning>{pollError}</Warning>}
         {!result.pending&&<button type="button" className="btn-primary" onClick={reset}>{ico('add-circle-linear',20)} Создать следующую</button>}
+        {result.pending&&<button type="button" className="btn-light" onClick={()=>setView('inbox')}>{ico('chat-round-dots-linear',18)} Перейти к списку заявок</button>}
       </section>:<div className="form-layout">
         <div className="form-panels">
           <section className="form-card glass-card">
@@ -297,9 +331,9 @@ export default function App(){
                   {PLANTS.map(p=><option key={p.code} value={p.code}>{p.name}</option>)}</select></div>
                   <div className="field"><label>Количество, мешков</label><div className="quantity-control">
                     <button type="button" onClick={()=>updateLine(line.key,{quantity:Math.max(1,line.quantity-1)})}>{ico('minus-circle-linear',19)}</button>
-                    <input aria-label="Количество мешков" type="number" min={1} max={100000} value={line.quantity}
-                      onChange={e=>updateLine(line.key,{quantity:Number(e.target.value)})}/>
-                    <button type="button" onClick={()=>updateLine(line.key,{quantity:line.quantity+1})}>{ico('add-circle-linear',19)}</button>
+                    <input aria-label="Количество мешков" type="number" inputMode="numeric" min={1} max={MAX_BAGS} value={line.quantity}
+                      onChange={e=>updateLine(line.key,{quantity:clampBags(Number(e.target.value))})}/>
+                    <button type="button" onClick={()=>updateLine(line.key,{quantity:Math.min(MAX_BAGS,line.quantity+1)})}>{ico('add-circle-linear',19)}</button>
                   </div></div></div>
                 {p&&<div className="line-footer"><span>{p.weight} кг / мешок</span><b>{fmt(p.weight*line.quantity)} кг</b></div>}
               </div>
@@ -312,7 +346,7 @@ export default function App(){
           <section className="form-card glass-card">
             <div className="card-head"><div className="step-icon">{ico('delivery-linear',23)}</div><div><span className="step-label">ШАГ 03 / 03</span><h2>Отгрузка</h2><p>Условия получения и дополнительные сведения</p></div></div>
             <div className="field"><label>Способ получения</label>{deliveryLabels}</div>
-            <div className="field-grid"><div className="field"><label htmlFor="date">Желаемая дата</label><input id="date" type="date" value={deliveryDate} onChange={e=>setDeliveryDate(e.target.value)}/></div>
+            <div className="field-grid"><div className="field"><label htmlFor="date">Желаемая дата</label><input id="date" type="date" min={currentTjDate()} value={deliveryDate} onChange={e=>setDeliveryDate(e.target.value)}/></div>
               <div className="field"><label htmlFor="address">Адрес / ориентир</label><input id="address" value={address} onChange={e=>setAddress(e.target.value)} placeholder="При необходимости" maxLength={160}/></div></div>
             <div className="field"><label htmlFor="notes">Примечание к заказу</label><textarea id="notes" rows={3} value={notes}
               onChange={e=>setNotes(e.target.value)} placeholder="Уточнения, автомобиль клиента, пожелания..." maxLength={400}/></div>
@@ -431,7 +465,7 @@ export default function App(){
                       <option value="">Выберите товар</option>{products.map(p=><option value={p.code} key={p.code}>{p.name} · {p.code}</option>)}</select></div>
                     <div className="field-grid"><div className="field"><label>Завод</label><select value={li.plant} onChange={e=>setDraftLines(arr=>arr.map(x=>x.key===li.key?{...x,plant:e.target.value}:x))}>
                       <option value="">Выбрать завод</option>{PLANTS.map(p=><option value={p.code} key={p.code}>{p.name}</option>)}</select></div>
-                      <div className="field"><label>Мешки</label><input type="number" min="1" max="100000" value={li.quantity} onChange={e=>setDraftLines(arr=>arr.map(x=>x.key===li.key?{...x,quantity:Number(e.target.value)}:x))}/></div></div>
+                      <div className="field"><label>Мешки</label><input type="number" inputMode="numeric" min="1" max={MAX_BAGS} value={li.quantity} onChange={e=>setDraftLines(arr=>arr.map(x=>x.key===li.key?{...x,quantity:clampBags(Number(e.target.value))}:x))}/></div></div>
                     {prod&&<div className="line-footer">{prod.weight} кг за мешок<span>{fmt(prod.weight*li.quantity)} кг</span></div>}
                   </div>;
                 })}
@@ -460,7 +494,7 @@ export default function App(){
     <nav className="mobile-dock glass-surface" aria-label="Мобильная навигация">
       <button className={view==='new'?'active':''} onClick={()=>setView('new')}>{ico('document-add-linear',22)}<span>Заявка</span></button>
       <button className={view==='inbox'?'active':''} onClick={()=>setView('inbox')}>{ico('chat-round-dots-linear',22)}<span>{isLogist?'Логистика':'Мои заявки'}</span></button>
-      <button onClick={()=>{haptic();view==='inbox'?loadOrders():setView('inbox')}}>{ico('refresh-circle-linear',22)}<span>Обновить</span></button>
+      {view==='inbox'&&<button onClick={()=>{haptic();loadOrders()}} disabled={listBusy}>{ico('refresh-circle-linear',22)}<span>Обновить</span></button>}
     </nav>
   </div>;
 }
